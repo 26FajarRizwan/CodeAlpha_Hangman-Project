@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Hangman Game — CodeAlpha</title>
+<style>
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: linear-gradient(160deg, #1f2333 0%, #11131c 100%);
+    font-family: 'Trebuchet MS', 'Segoe UI', sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .card {
+    background: #20243a;
+    border: 1px solid #353c5c;
+    border-radius: 16px;
+    padding: 30px 36px 36px;
+    width: 480px;
+    max-width: 100%;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+    color: #e9ecf5;
+    text-align: center;
+  }
+
+  h1 {
+    margin: 0 0 4px;
+    font-size: 26px;
+    color: #ffd166;
+    letter-spacing: 1px;
+  }
+
+  .subtitle {
+    font-size: 13px;
+    color: #8b91ab;
+    margin-bottom: 20px;
+  }
+
+  /* ----- Gallows / hangman SVG graphic ----- */
+  .gallows-wrap {
+    background: #161829;
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 18px;
+    display: flex;
+    justify-content: center;
+  }
+
+  svg#hangman-svg {
+    width: 200px;
+    height: 220px;
+  }
+
+  .pole, .beam, .rope {
+    stroke: #cfd3e6;
+    stroke-width: 4;
+    stroke-linecap: round;
+  }
+
+  .base { stroke: #585f80; stroke-width: 6; stroke-linecap: round; }
+
+  .body-part {
+    stroke: #ff6b6b;
+    stroke-width: 4;
+    stroke-linecap: round;
+    fill: none;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+  }
+
+  .body-part.show { opacity: 1; }
+
+  .head {
+    fill: none;
+    stroke: #ff6b6b;
+    stroke-width: 4;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+  }
+
+  .head.show { opacity: 1; }
+
+  /* ----- Word display ----- */
+  .word-display {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin: 18px 0 8px;
+  }
+
+  .letter-slot {
+    width: 32px;
+    height: 40px;
+    border-bottom: 3px solid #6fd3a4;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    font-weight: bold;
+    text-transform: uppercase;
+    color: #6fd3a4;
+  }
+
+  .status-line {
+    font-size: 14px;
+    color: #aab0cc;
+    margin: 6px 0 4px;
+  }
+
+  .wrong-letters {
+    font-size: 13px;
+    color: #ff8a8a;
+    min-height: 18px;
+    margin-bottom: 10px;
+  }
+
+  .message {
+    font-size: 17px;
+    font-weight: bold;
+    min-height: 26px;
+    margin: 10px 0;
+  }
+
+  .message.win { color: #6fd3a4; }
+  .message.lose { color: #ff6b6b; }
+
+  /* ----- Keyboard ----- */
+  .keyboard {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+    margin: 16px 0 8px;
+  }
+
+  .key {
+    width: 34px;
+    height: 36px;
+    border-radius: 6px;
+    border: none;
+    background: #343a5c;
+    color: #e9ecf5;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: transform 0.08s, background 0.15s;
+  }
+
+  .key:hover:not(:disabled) {
+    background: #454d78;
+    transform: translateY(-2px);
+  }
+
+  .key:disabled {
+    cursor: default;
+    opacity: 0.35;
+  }
+
+  .key.correct {
+    background: #2f7a55;
+    color: #d4ffe9;
+    opacity: 1;
+  }
+
+  .key.wrong {
+    background: #8c2f2f;
+    color: #ffd9d9;
+    opacity: 1;
+  }
+
+  .restart-btn {
+    margin-top: 14px;
+    padding: 10px 26px;
+    border: none;
+    border-radius: 8px;
+    background: #ffd166;
+    color: #1f2333;
+    font-weight: bold;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .restart-btn:hover { background: #ffdd8c; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <h1>🎮 Hangman</h1>
+  <div class="subtitle">CodeAlpha Internship — Task 1</div>
+
+  <div class="gallows-wrap">
+    <svg id="hangman-svg" viewBox="0 0 160 180">
+      <!-- Gallows structure (always visible) -->
+      <line class="base" x1="20" y1="170" x2="100" y2="170"/>
+      <line class="pole" x1="40" y1="170" x2="40" y2="20"/>
+      <line class="beam" x1="40" y1="20" x2="110" y2="20"/>
+      <line class="rope" x1="110" y1="20" x2="110" y2="40"/>
+
+      <!-- Body parts (revealed step by step) -->
+      <circle id="part-head" class="head" cx="110" cy="55" r="15"/>
+      <line id="part-body" class="body-part" x1="110" y1="70" x2="110" y2="115"/>
+      <line id="part-arm-left" class="body-part" x1="110" y1="85" x2="90" y2="105"/>
+      <line id="part-arm-right" class="body-part" x1="110" y1="85" x2="130" y2="105"/>
+      <line id="part-leg-left" class="body-part" x1="110" y1="115" x2="92" y2="145"/>
+      <line id="part-leg-right" class="body-part" x1="110" y1="115" x2="128" y2="145"/>
+    </svg>
+  </div>
+
+  <div class="word-display" id="word-display"></div>
+  <div class="status-line" id="status-line"></div>
+  <div class="wrong-letters" id="wrong-letters"></div>
+  <div class="message" id="message"></div>
+
+  <div class="keyboard" id="keyboard"></div>
+
+  <button class="restart-btn" onclick="startGame()">🔄 New Game</button>
+</div>
+
+<script>
+  // SAME word list as the Python version (hangman.py) — keep these in sync.
+  const WORDS = ["python", "hangman", "laptop", "jungle", "matrix"];
+  const MAX_WRONG = 6;
+
+  const bodyParts = [
+    "part-head",
+    "part-body",
+    "part-arm-left",
+    "part-arm-right",
+    "part-leg-left",
+    "part-leg-right"
+  ];
+
+  let secretWord = "";
+  let guessedLetters = new Set();
+  let wrongCount = 0;
+  let gameOver = false;
+
+  function startGame() {
+    secretWord = WORDS[Math.floor(Math.random() * WORDS.length)];
+    guessedLetters = new Set();
+    wrongCount = 0;
+    gameOver = false;
+
+    bodyParts.forEach(id => document.getElementById(id).classList.remove("show"));
+
+    buildKeyboard();
+    render();
+  }
+
+  function buildKeyboard() {
+    const kb = document.getElementById("keyboard");
+    kb.innerHTML = "";
+    for (let i = 97; i <= 122; i++) {
+      const letter = String.fromCharCode(i);
+      const btn = document.createElement("button");
+      btn.className = "key";
+      btn.textContent = letter.toUpperCase();
+      btn.id = "key-" + letter;
+      btn.onclick = () => handleGuess(letter);
+      kb.appendChild(btn);
+    }
+  }
+
+  function handleGuess(letter) {
+    if (gameOver || guessedLetters.has(letter)) return;
+
+    guessedLetters.add(letter);
+    const keyBtn = document.getElementById("key-" + letter);
+
+    if (secretWord.includes(letter)) {
+      keyBtn.classList.add("correct");
+    } else {
+      keyBtn.classList.add("wrong");
+      wrongCount++;
+      document.getElementById(bodyParts[wrongCount - 1]).classList.add("show");
+    }
+    keyBtn.disabled = true;
+
+    checkGameEnd();
+    render();
+  }
+
+  function checkGameEnd() {
+    const won = [...secretWord].every(l => guessedLetters.has(l));
+    const lost = wrongCount >= MAX_WRONG;
+
+    if (won || lost) {
+      gameOver = true;
+      document.querySelectorAll(".key").forEach(k => k.disabled = true);
+    }
+  }
+
+  function render() {
+    // Word display
+    const wordDiv = document.getElementById("word-display");
+    wordDiv.innerHTML = "";
+    for (const letter of secretWord) {
+      const slot = document.createElement("div");
+      slot.className = "letter-slot";
+      slot.textContent = guessedLetters.has(letter) ? letter : "";
+      wordDiv.appendChild(slot);
+    }
+
+    // Status
+    const remaining = MAX_WRONG - wrongCount;
+    document.getElementById("status-line").textContent =
+      gameOver ? "" : `Wrong guesses left: ${remaining}`;
+
+    // Wrong letters list
+    const wrongLetters = [...guessedLetters].filter(l => !secretWord.includes(l)).sort();
+    document.getElementById("wrong-letters").textContent =
+      wrongLetters.length ? "Incorrect: " + wrongLetters.join(", ").toUpperCase() : "";
+
+    // Message
+    const msgDiv = document.getElementById("message");
+    const won = [...secretWord].every(l => guessedLetters.has(l));
+    if (won) {
+      msgDiv.textContent = "🎉 You won!";
+      msgDiv.className = "message win";
+    } else if (wrongCount >= MAX_WRONG) {
+      msgDiv.textContent = "💀 Game over! Word was: " + secretWord.toUpperCase();
+      msgDiv.className = "message lose";
+    } else {
+      msgDiv.textContent = "";
+      msgDiv.className = "message";
+    }
+  }
+
+  startGame();
+</script>
+
+</body>
+</html>
